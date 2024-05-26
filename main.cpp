@@ -19,6 +19,8 @@ void add_new_line(char** current_text) {
     size_t length_of_current_text = strlen(*current_text);
     *current_text = (char*)realloc(*current_text, length_of_current_text + 2);
     strcat(*current_text, "\n");
+
+    printf("New line created!\n");
 }
 
 void save_to_file(char* filename, char* current_text) {
@@ -57,6 +59,52 @@ void load_from_file(char* filename, char** current_text) {
     printf("Loaded from file!\n");
 }
 
+void insert_text(char** current_text) {
+    printf("Enter the line and position to insert the text: ");
+    int line, position;
+    scanf("%d %d", &line, &position);
+
+    printf("Enter the text to insert: ");
+    char buffer[100];
+    while (getchar() != '\n'){}
+    fgets(buffer, 100, stdin);
+
+    size_t buffer_len = strlen(buffer);
+    if (buffer[buffer_len - 1] == '\n') {
+        buffer[buffer_len - 1] = '\0';
+        buffer_len--;
+    }
+
+    int current_line = 0;
+    int current_position = 0;
+    char* text = *current_text;
+    size_t text_len = strlen(text);
+
+    while(current_line <= line && current_position <= text_len) {
+       if(text[current_position] == '\n') {
+           current_line++;
+           current_position++;
+       }
+        current_position++;
+
+        if (current_line == line) {
+            break;
+        }
+
+    }
+
+    size_t insertion_position = current_position + position - 1;
+    size_t new_text_len = text_len + buffer_len;
+    *current_text = (char*)realloc(*current_text, new_text_len + 1);
+
+    text = *current_text;
+
+    memmove(text + insertion_position + buffer_len, text + insertion_position, text_len - insertion_position + 1);
+    memcpy(text + insertion_position, buffer, buffer_len);
+
+    printf("Text inserted!\n");
+}
+
 int main()
 {
 
@@ -71,13 +119,12 @@ int main()
         switch (users_choice) {
             case '1': {
                 enter_text(&string);
-                printf("%s\n", string);
+                //printf("%s\n", string);
                 break;
             }
             case '2': {
                 add_new_line(&string);
-                printf("New line created!\n");
-                printf("%s\n", string);
+                //printf("%s\n", string);
                 break;
             }
 
@@ -98,7 +145,17 @@ int main()
                 filename[strcspn(filename, "\n")] = '\0';
                 // char *filename = "/Users/dlitvakk21/CLionProjects/text-editor/loadtext.txt";
                 load_from_file(filename, &string);
+                //printf("%s\n", string);
+                break;
+            }
+
+            case '5': {
                 printf("%s\n", string);
+                break;
+            }
+
+            case '6': {
+                insert_text(&string);
                 break;
             }
 
@@ -111,5 +168,6 @@ int main()
             default: printf("Invalid command! Try again.\n");
         }
     }
+
     return 0;
 }
