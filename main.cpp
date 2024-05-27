@@ -105,17 +105,59 @@ void insert_text(char** current_text) {
     printf("Text inserted!\n");
 }
 
+void find_text(char **current_text) {
+    printf("Enter the text to search: ");
+    char buffer[100];
+    fgets(buffer, 100, stdin);
+    size_t buffer_len = strlen(buffer);
+    if (buffer[buffer_len - 1] == '\n') {
+        buffer[buffer_len - 1] = '\0';
+    }
+
+    char* text = *current_text;
+    size_t text_len = strlen(text);
+
+    int line_number = 0;
+    int current_position = 0;
+    bool found = false;
+    while (current_position < text_len) {
+        char* found_position = strstr(text + current_position, buffer);
+        if (found_position == nullptr) {
+            break;
+        }
+        found = true;
+
+        int line_position = 0;
+
+        for (char* ptr = text; ptr < found_position; ++ptr) {
+            if (*ptr == '\n') {
+                line_number++;
+                line_position = 0;
+            }
+            line_position++;
+        }
+
+        printf("Found '%s' at line %d, position %d\n", buffer, line_number, line_position);
+        line_number = 0;
+
+        current_position = found_position - text + 1;
+    }
+
+    if (found == false) {
+        printf("Text is not found!\n");
+    }
+}
 int main()
 {
 
-    printf("Enter '1' to enter text to the end\n'2' to add new line\n'3' to save TO file\n'4' to load FROM file\n'5' to print the text to console\n'6' to insert text\n'7' to search for text\n '0' to exit\n\n");
+    printf("Enter '1' to enter text to the end\n'2' to add new line\n'3' to save TO file\n'4' to load FROM file\n'5' to print the text to console\n'6' to insert text\n'7' to search for text \n'0' TO EXIT\n\n");
     char* string = (char*)malloc(sizeof(char));
     string[0] = '\0';
 
     while(true) {
         printf("Enter the command: ");
         char users_choice = getchar();
-        while (getchar() != '\n');
+        while (getchar() != '\n') {}
         switch (users_choice) {
             case '1': {
                 enter_text(&string);
@@ -140,7 +182,7 @@ int main()
 
             case '4': {
                 char filename[100];
-                printf("Enter the file name for saving: ");
+                printf("Enter the file name for loading: ");
                 fgets(filename, 100, stdin);
                 filename[strcspn(filename, "\n")] = '\0';
                 // char *filename = "/Users/dlitvakk21/CLionProjects/text-editor/loadtext.txt";
@@ -159,6 +201,10 @@ int main()
                 break;
             }
 
+            case '7': {
+                find_text(&string);
+                break;
+            }
             case '0': {
                 printf("Thanks for using the program!\n");
                 free(string);
