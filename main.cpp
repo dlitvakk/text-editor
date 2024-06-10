@@ -1,219 +1,224 @@
 #include <iostream>
+using namespace std;
 
-void enter_text(char** current_text) {
-    printf("Enter the text: ");
-    char buffer[100];
-    fgets(buffer, 100, stdin);
-    size_t length_of_current_text = strlen(*current_text);
-    size_t length_of_input = strlen(buffer);
-    *current_text = (char*)realloc(*current_text, length_of_current_text + length_of_input + 1);
+class TextEditor {
+    char* text;
+    size_t length;
 
-    strcat(*current_text, buffer);
-
-    if ((*current_text)[strlen(*current_text) - 1] == '\n') {
-        (*current_text)[strlen(*current_text) - 1] = '\0';
-    }
-}
-
-void add_new_line(char** current_text) {
-    size_t length_of_current_text = strlen(*current_text);
-    *current_text = (char*)realloc(*current_text, length_of_current_text + 2);
-    strcat(*current_text, "\n");
-
-    printf("New line created!\n");
-}
-
-void save_to_file(char* filename, char* current_text) {
-    FILE *savefile = fopen(filename, "w");
-    if (savefile == nullptr) {
-        printf("Error opening file!\n");
-        return;
-    }
-    fprintf(savefile, "%s", current_text);
-    fclose(savefile);
-
-    printf("Saved to file!\n");
-}
-
-void load_from_file(char* filename, char** current_text) {
-
-    FILE *loadfile = fopen(filename, "r");
-    if (loadfile == nullptr) {
-        printf("Error opening file!\n");
-        return;
+    void capacity(size_t newLength) {
+        if (newLength > length) {
+            text = (char*)realloc(text, newLength);
+            length = newLength;
+        }
     }
 
-    free(*current_text);
-    *current_text = (char*)malloc(sizeof(char));
-    (*current_text)[0] = '\0';
-
-    char buffer[100];
-    while (fgets(buffer, 100, loadfile) != nullptr) {
-        size_t length_of_current_text = strlen(*current_text);
-        size_t length_of_input = strlen(buffer);
-        *current_text = (char*)realloc(*current_text, length_of_current_text + length_of_input + 1);
-        strcat(*current_text, buffer);
-    }
-    fclose(loadfile);
-
-    printf("Loaded from file!\n");
-}
-
-void insert_text(char** current_text) {
-    printf("Enter the line and position to insert the text: ");
-    int line, position;
-    scanf("%d %d", &line, &position);
-
-    printf("Enter the text to insert: ");
-    char buffer[100];
-    while (getchar() != '\n'){}
-    fgets(buffer, 100, stdin);
-
-    size_t buffer_len = strlen(buffer);
-    if (buffer[buffer_len - 1] == '\n') {
-        buffer[buffer_len - 1] = '\0';
-        buffer_len--;
+public:
+    TextEditor() : text(nullptr), length(0) { // A place for constructing the object, setting default values and memory allocation
+        text = (char*)malloc(1);
+        text[0] = '\0';
     }
 
-    int current_line = 0;
-    int current_position = 0;
-    char* text = *current_text;
-    size_t text_len = strlen(text);
+    ~TextEditor() { // A place where memory deallocation and object descrutrion takes place
+        free(text);
+    }
 
-    while(current_line <= line && current_position <= text_len) {
-       if(text[current_position] == '\n') {
-           current_line++;
-           current_position++;
-       }
-        current_position++;
+    char* getText() const { // const means that this method does not change the object
+        return text;
+    }
 
-        if (current_line == line) {
-            break;
+    void enterText(const char* newText) {
+        size_t newLength = strlen(newText);
+        size_t oldLength = strlen(text);
+        capacity(oldLength + newLength + 1);
+        strcat(text, newText);
+    }
+
+    void addNewLine() {
+        size_t oldLength = strlen(text);
+        capacity(oldLength + 2);
+        strcat(text, "\n");
+    }
+
+    void insert(size_t line, size_t posInLine, char* newText) {
+        size_t buffer_len = strlen(newText);
+        if (newText[buffer_len - 1] == '\n') {
+            newText[buffer_len - 1] = '\0';
+            buffer_len--;
         }
 
-    }
+        int current_line = 0;
+        int current_position = 0;
+        size_t text_len = strlen(text);
 
-    size_t insertion_position = current_position + position - 1;
-    size_t new_text_len = text_len + buffer_len;
-    *current_text = (char*)realloc(*current_text, new_text_len + 1);
-
-    text = *current_text;
-
-    memmove(text + insertion_position + buffer_len, text + insertion_position, text_len - insertion_position + 1);
-    memcpy(text + insertion_position, buffer, buffer_len);
-
-    printf("Text inserted!\n");
-}
-
-void find_text(char **current_text) {
-    printf("Enter the text to search: ");
-    char buffer[100];
-    fgets(buffer, 100, stdin);
-    size_t buffer_len = strlen(buffer);
-    if (buffer[buffer_len - 1] == '\n') {
-        buffer[buffer_len - 1] = '\0';
-    }
-
-    char* text = *current_text;
-    size_t text_len = strlen(text);
-
-    int line_number = 0;
-    int current_position = 0;
-    bool found = false;
-    while (current_position < text_len) {
-        char* found_position = strstr(text + current_position, buffer);
-        if (found_position == nullptr) {
-            break;
-        }
-        found = true;
-
-        int line_position = 0;
-
-        for (char* ptr = text; ptr < found_position; ++ptr) {
-            if (*ptr == '\n') {
-                line_number++;
-                line_position = 0;
+        while (current_line <= line && current_position <= static_cast<int>(text_len)) {
+            if (text[current_position] == '\n') {
+                current_line++;
+                current_position++;
             }
-            line_position++;
+            current_position++;
+
+            if (current_line == line) {
+                break;
+            }
         }
 
-        printf("Found '%s' at line %d, position %d\n", buffer, line_number, line_position);
-        line_number = 0;
+        size_t insertion_position = current_position + posInLine - 1;
+        size_t new_text_len = text_len + buffer_len;
+        text = (char*)realloc(text, new_text_len + 1);
 
-        current_position = found_position - text + 1;
+        memmove(text + insertion_position + buffer_len, text + insertion_position, text_len - insertion_position + 1);
+        memcpy(text + insertion_position, newText, buffer_len);
     }
 
-    if (found == false) {
-        printf("Text is not found!\n");
+    void clear() {
+        capacity(1);
+        text[0] = '\0';
     }
-}
-int main()
-{
 
-    printf("Enter '1' to enter text to the end\n'2' to add new line\n'3' to save TO file\n'4' to load FROM file\n'5' to print the text to console\n'6' to insert text\n'7' to search for text \n'0' TO EXIT\n\n");
-    char* string = (char*)malloc(sizeof(char));
-    string[0] = '\0';
+    void loadFromFile(const char* filename) {
+        FILE* file = fopen(filename, "r");
+        if (!file) {
+            cerr << "Error opening file!" << endl;
+            return;
+        }
+        clear();
+        char buffer[256];
+        while (fgets(buffer, sizeof(buffer), file)) {
+            enterText(buffer);
+        }
+        fclose(file);
+    }
 
-    while(true) {
-        printf("Enter the command: ");
-        char users_choice = getchar();
-        while (getchar() != '\n') {}
-        switch (users_choice) {
+    void saveToFile(const char* filename) {
+        FILE* file = fopen(filename, "w");
+        if (!file) {
+            cerr << "Error opening file!" << endl;
+            return;
+        }
+        fputs(text, file);
+        fclose(file);
+    }
+
+    void print() const {
+        cout << text << endl;
+    }
+
+    void findText(const char* searchText) const {
+        const char* foundPosition = text;
+        bool found = false;
+
+        while ((foundPosition = strstr(foundPosition, searchText)) != nullptr) {
+
+            size_t lineNumber = 0;
+            size_t linePosition = 0;
+            for (const char* pointer = text; pointer < foundPosition; ++pointer) {
+                if (*pointer == '\n') {
+                    lineNumber++;
+                    linePosition = 1;
+                } else {
+                    linePosition++;
+                }
+            }
+
+            cout << "Found '" << searchText << "' at line " << lineNumber << ", position " << linePosition << endl;
+            foundPosition++;
+            found = true;
+        }
+
+        if (!found) {
+            cout << "Text is not found!" << endl;
+        }
+    }
+};
+
+int main() {
+    TextEditor editor;
+    char command;
+
+    cout << "Enter '1' to enter text to the end" << endl;
+    cout << "'2' to add new line" << endl;
+    cout << "'3' to save TO file" << endl;
+    cout << "'4' to load FROM file" << endl;
+    cout << "'5' to print the text to console" << endl;
+    cout << "'6' to insert text" << endl;
+    cout << "'7' to search for text" << endl;
+    cout << "'0' TO EXIT" << endl;
+    cout << endl;
+
+    do {
+        cout << "Enter the command: ";
+        cin >> command;
+
+        switch (command) {
             case '1': {
-                enter_text(&string);
-                //printf("%s\n", string);
+                cout << "Enter the text to add: ";
+                char newText[256];
+                cin.ignore();
+                cin.getline(newText, sizeof(newText));
+                editor.enterText(newText);
                 break;
             }
             case '2': {
-                add_new_line(&string);
-                //printf("%s\n", string);
+                editor.addNewLine();
+                cout << "New line added!" << endl;
                 break;
             }
-
             case '3': {
                 char filename[100];
-                printf("Enter the file name for saving: ");
-                fgets(filename, 100, stdin);
-                filename[strcspn(filename, "\n")] = '\0';
-                // char *filename = "/Users/dlitvakk21/CLionProjects/text-editor/savetext.txt";
-                save_to_file(filename, string);
+                cout << "Enter the file name for saving: ";
+                cin >> filename;
+                editor.saveToFile(filename);
+                cout << "Text saved to file!" << endl;
                 break;
             }
-
             case '4': {
                 char filename[100];
-                printf("Enter the file name for loading: ");
-                fgets(filename, 100, stdin);
-                filename[strcspn(filename, "\n")] = '\0';
-                // char *filename = "/Users/dlitvakk21/CLionProjects/text-editor/loadtext.txt";
-                load_from_file(filename, &string);
-                //printf("%s\n", string);
+                cout << "Enter the file name for loading: ";
+                cin >> filename;
+                editor.loadFromFile(filename);
+                cout << "Text loaded from file!" << endl;
                 break;
             }
-
             case '5': {
-                printf("%s\n", string);
+                editor.print();
                 break;
             }
-
             case '6': {
-                insert_text(&string);
+                size_t line, pos;
+                char newText[256];
+                cout << "Enter the line number: ";
+                cin >> line;
+                cout << "Enter the position in line: ";
+                cin >> pos;
+                cout << "Enter the text to insert: ";
+                cin.ignore();
+                cin.getline(newText, sizeof(newText));
+                editor.insert(line, pos, newText);
+                cout << "Text inserted!" << endl;
                 break;
             }
-
             case '7': {
-                find_text(&string);
+                cout << "Enter the text to search: ";
+                char searchText[256];
+                cin.ignore();
+                cin.getline(searchText, sizeof(searchText));
+                editor.findText(searchText);
                 break;
             }
             case '0': {
-                printf("Thanks for using the program!\n");
-                free(string);
-                exit(0);
+                cout << "Thanks for using the program!" << endl;
+                break;
             }
-
-            default: printf("Invalid command! Try again.\n");
+            default: {
+                cout << "Invalid command! Try again." << endl;
+                break;
+            }
         }
-    }
+
+    } while (command != '0');
 
     return 0;
 }
+
+// /Users/dlitvakk21/CLionProjects/text-editor/savetext.txt
+// /Users/dlitvakk21/CLionProjects/text-editor/loadtext.txt
