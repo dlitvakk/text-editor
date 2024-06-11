@@ -7,6 +7,8 @@ class TextEditor {
     size_t length;
     stack<char*> undoStack;
     stack<char*> redoStack;
+    char* bufferCopy;
+
 
     void capacity(size_t newLength) {
         if (newLength > length) {
@@ -29,7 +31,7 @@ class TextEditor {
     }
 
 public:
-    TextEditor() : text(nullptr), length(0) { // A place for constructing the object, setting default values and memory allocation
+    TextEditor() : text(nullptr), length(0), bufferCopy(nullptr) { // A place for constructing the object, setting default values and memory allocation
         text = (char*)malloc(1);
         text[0] = '\0';
     }
@@ -42,6 +44,7 @@ public:
         }
 
         emptyRedoStack();
+        free(bufferCopy);
     }
 
     char* getText() const { // const means that this method does not change the object
@@ -192,8 +195,8 @@ public:
             cout << "Successful undo!" << endl;
         }
 
-        if(undoStack.empty()) {
-            cout << "No more commands to undo!" << endl;
+        else {
+            cout << "No commands to undo!" << endl;
         }
     }
 
@@ -201,12 +204,79 @@ public:
         if (!redoStack.empty()) {
             saveCommand(undoStack);
             free(text);
-            redoStack.pop();
+            // redoStack.pop();
             text = redoStack.top();
+            redoStack.pop();
             cout << "Successful redo!" << endl;
-        } else {
-            cout << "No more commands to redo!" << endl;
         }
+
+        else {
+            cout << "No commands to redo!" << endl;
+        }
+    }
+    void cutText(size_t line, size_t posInLine, size_t numSymbols) {
+        size_t current_line = 0;
+        size_t current_position = 0;
+        size_t text_len = strlen(text);
+
+        while (current_line <= line && current_position <= text_len) {
+            if (text[current_position] == '\n') {
+                current_line++;
+                current_position++;
+            }
+            current_position++;
+
+            if (current_line == line) {
+                break;
+            }
+        }
+
+        size_t start_position = current_position + posInLine - 1;
+        if (start_position + numSymbols > text_len) {
+            numSymbols = text_len - start_position;
+        }
+
+        bufferCopy = (char*)realloc(bufferCopy, numSymbols + 1);
+        strncpy(bufferCopy, text + start_position, numSymbols);
+        bufferCopy[numSymbols] = '\0';
+
+        deleteText(line, posInLine, numSymbols);
+    }
+
+    void copyText(size_t line, size_t posInLine, size_t numSymbols) {
+        size_t current_line = 0;
+        size_t current_position = 0;
+        size_t text_len = strlen(text);
+
+        while (current_line <= line && current_position <= text_len) {
+            if (text[current_position] == '\n') {
+                current_line++;
+                current_position++;
+            }
+            current_position++;
+
+            if (current_line == line) {
+                break;
+            }
+        }
+
+        size_t start_position = current_position + posInLine - 1;
+        if (start_position + numSymbols > text_len) {
+            numSymbols = text_len - start_position;
+        }
+
+        bufferCopy = (char*)realloc(bufferCopy, numSymbols + 1);
+        strncpy(bufferCopy, text + start_position, numSymbols);
+        bufferCopy[numSymbols] = '\0';
+    }
+
+    void pasteText(size_t line, size_t posInLine) {
+        if (bufferCopy == nullptr) {
+            cout << "Clipboard is empty!" << endl;
+            return;
+        }
+
+        insert(line, posInLine, bufferCopy);
     }
 };
 
@@ -214,17 +284,20 @@ int main() {
     TextEditor editor;
     char command;
 
-    cout << "Enter '1' to enter text to the end" << endl;
-    cout << "'2' to add new line" << endl;
-    cout << "'3' to save TO file" << endl;
-    cout << "'4' to load FROM file" << endl;
-    cout << "'5' to print the text to console" << endl;
-    cout << "'6' to insert text" << endl;
-    cout << "'7' to search for text" << endl;
-    cout << "'8' to delete" << endl;
-    cout << "'9' to undo command" << endl;
-    cout << "'a' to undo command" << endl;
-    cout << "'0' TO EXIT" << endl;
+    cout << "Enter 'a' to enter text to the end" << endl;
+    cout << "'b' to add new line" << endl;
+    cout << "'c' to save TO file" << endl;
+    cout << "'d' to load FROM file" << endl;
+    cout << "'e' to print the text to console" << endl;
+    cout << "'f' to insert text" << endl;
+    cout << "'g' to search for text" << endl;
+    cout << "'h' to delete" << endl;
+    cout << "'i' to undo command" << endl;
+    cout << "'j' to redo command" << endl;
+    cout << "'k' to cut text" << endl;
+    cout << "'l' to copy text" << endl;
+    cout << "'m' to paste text" << endl;
+    cout << "'o' TO EXIT" << endl;
     cout << endl;
 
     do {
@@ -232,7 +305,7 @@ int main() {
         cin >> command;
 
         switch (command) {
-            case '1': {
+            case 'a': {
                 cout << "Enter the text to add: ";
                 char newText[256];
                 cin.ignore();
@@ -240,12 +313,12 @@ int main() {
                 editor.enterText(newText);
                 break;
             }
-            case '2': {
+            case 'b': {
                 editor.addNewLine();
                 cout << "New line added!" << endl;
                 break;
             }
-            case '3': {
+            case 'c': {
                 char filename[100];
                 cout << "Enter the file name for saving: ";
                 cin >> filename;
@@ -253,7 +326,7 @@ int main() {
                 cout << "Text saved to file!" << endl;
                 break;
             }
-            case '4': {
+            case 'd': {
                 char filename[100];
                 cout << "Enter the file name for loading: ";
                 cin >> filename;
@@ -261,11 +334,11 @@ int main() {
                 cout << "Text loaded from file!" << endl;
                 break;
             }
-            case '5': {
+            case 'e': {
                 editor.print();
                 break;
             }
-            case '6': {
+            case 'f': {
                 size_t line, pos;
                 char newText[256];
                 cout << "Enter the line number: ";
@@ -279,7 +352,7 @@ int main() {
                 cout << "Text inserted!" << endl;
                 break;
             }
-            case '7': {
+            case 'g': {
                 cout << "Enter the text to search: ";
                 char searchText[256];
                 cin.ignore();
@@ -287,7 +360,7 @@ int main() {
                 editor.findText(searchText);
                 break;
             }
-            case '8': {
+            case 'h': {
                 size_t line, pos, numSymbols;
                 cout << "Enter the line number: ";
                 cin >> line;
@@ -299,16 +372,51 @@ int main() {
                 cout << "Text deleted!" << endl;
                 break;
             }
-            case '9': {
+            case 'i': {
                 editor.undo();
                 break;
             }
-            case 'a': {
+            case 'j': {
                 editor.redo();
                 break;
             }
+            case 'k': {
+                size_t line, pos, numSymbols;
+                cout << "Enter the line number: ";
+                cin >> line;
+                cout << "Enter the position in line: ";
+                cin >> pos;
+                cout << "Enter the number of symbols to cut: ";
+                cin >> numSymbols;
+                editor.cutText(line, pos, numSymbols);
+                cout << "Text cut!" << endl;
+                break;
+            }
+            case 'l': {
+                size_t line, pos, numSymbols;
+                cout << "Enter the line number: ";
+                cin >> line;
+                cout << "Enter the position in line: ";
+                cin >> pos;
+                cout << "Enter the number of symbols to copy: ";
+                cin >> numSymbols;
+                editor.copyText(line, pos, numSymbols);
+                cout << "Text copied!" << endl;
+                break;
+            }
 
-            case '0': {
+            case 'm': {
+                size_t line, pos;
+                cout << "Enter the line number: ";
+                cin >> line;
+                cout << "Enter the position in line: ";
+                cin >> pos;
+                editor.pasteText(line, pos);
+                cout << "Text pasted!" << endl;
+                break;
+            }
+
+            case 'o': {
                 cout << "Thanks for using the program!" << endl;
                 break;
             }
@@ -318,7 +426,7 @@ int main() {
             }
         }
 
-    } while (command != '0');
+    } while (command != 'o');
 
     return 0;
 }
