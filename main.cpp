@@ -21,8 +21,7 @@ class TextEditor {
         stack.push(newCommand);
     }
 
-    void saveUndos() {
-        saveCommand(undoStack);
+    void emptyRedoStack() {
         while (!redoStack.empty()) {
             free(redoStack.top());
             redoStack.pop();
@@ -42,10 +41,7 @@ public:
             undoStack.pop();
         }
 
-        while (!redoStack.empty()) {
-            free(redoStack.top());
-            redoStack.pop();
-        }
+        emptyRedoStack();
     }
 
     char* getText() const { // const means that this method does not change the object
@@ -58,6 +54,7 @@ public:
         capacity(oldLength + newLength + 1);
         strcat(text, newText);
         saveCommand(undoStack);
+        emptyRedoStack();
     }
 
     void addNewLine() {
@@ -65,6 +62,7 @@ public:
         capacity(oldLength + 2);
         strcat(text, "\n");
         saveCommand(undoStack);
+        emptyRedoStack();
     }
 
     void insert(size_t line, size_t posInLine, char* newText) {
@@ -97,6 +95,7 @@ public:
         memmove(text + insertion_position + buffer_len, text + insertion_position, text_len - insertion_position + 1);
         memcpy(text + insertion_position, newText, buffer_len);
         saveCommand(undoStack);
+        emptyRedoStack();
     }
 
     void clear() {
@@ -181,13 +180,16 @@ public:
 
         memmove(text + start_position, text + end_position, text_len - end_position + 1);
         saveCommand(undoStack);
+        emptyRedoStack();
     }
 
     void undo() {
         if (!undoStack.empty()) {
+            saveCommand(redoStack);
             free(text);
             undoStack.pop();
             text = undoStack.top();
+            cout << "Successful undo!" << endl;
         }
 
         if(undoStack.empty()) {
@@ -199,8 +201,9 @@ public:
         if (!redoStack.empty()) {
             saveCommand(undoStack);
             free(text);
-            text = redoStack.top();
             redoStack.pop();
+            text = redoStack.top();
+            cout << "Successful redo!" << endl;
         } else {
             cout << "No more commands to redo!" << endl;
         }
