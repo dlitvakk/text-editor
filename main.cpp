@@ -44,7 +44,9 @@ public:
         }
 
         emptyRedoStack();
-        free(bufferCopy);
+        if (bufferCopy != nullptr) {
+            free(bufferCopy);
+        }
     }
 
     char* getText() const { // const means that this method does not change the object
@@ -68,7 +70,7 @@ public:
         emptyRedoStack();
     }
 
-    void insert(size_t line, size_t posInLine, char* newText) {
+    void insert(int line, int posititon, char* newText) {
         size_t buffer_len = strlen(newText);
         if (newText[buffer_len - 1] == '\n') {
             newText[buffer_len - 1] = '\0';
@@ -91,7 +93,7 @@ public:
             }
         }
 
-        size_t insertion_position = current_position + posInLine - 1;
+        int insertion_position = current_position + posititon - 1;
         size_t new_text_len = text_len + buffer_len;
         text = (char*)realloc(text, new_text_len + 1);
 
@@ -140,8 +142,8 @@ public:
 
         while ((foundPosition = strstr(foundPosition, searchText)) != nullptr) {
 
-            size_t lineNumber = 0;
-            size_t linePosition = 0;
+            int lineNumber = 0;
+            int linePosition = 0;
             for (const char* pointer = text; pointer < foundPosition; ++pointer) {
                 if (*pointer == '\n') {
                     lineNumber++;
@@ -161,10 +163,10 @@ public:
         }
     }
 
-    void deleteText(size_t line, size_t posInLine, size_t numSymbols) {
-        size_t current_line = 0;
-        size_t current_position = 0;
-        size_t text_len = strlen(text);
+    void deleteText(int line, int position, int numSymbols) {
+        int current_line = 0;
+        int current_position = 0;
+        int text_len = strlen(text);
 
         while (current_line <= line && current_position <= text_len) {
             if (text[current_position] == '\n') {
@@ -178,8 +180,8 @@ public:
             }
         }
 
-        size_t start_position = current_position + posInLine - 1;
-        size_t end_position = start_position + numSymbols;
+        int start_position = current_position + position - 1;
+        int end_position = start_position + numSymbols;
 
         memmove(text + start_position, text + end_position, text_len - end_position + 1);
         saveCommand(undoStack);
@@ -214,10 +216,10 @@ public:
             cout << "No commands to redo!" << endl;
         }
     }
-    void cutText(size_t line, size_t posInLine, size_t numSymbols) {
-        size_t current_line = 0;
-        size_t current_position = 0;
-        size_t text_len = strlen(text);
+    void cutText(int line, int position, int numSymbols) {
+        int current_line = 0;
+        int current_position = 0;
+        int text_len = strlen(text);
 
         while (current_line <= line && current_position <= text_len) {
             if (text[current_position] == '\n') {
@@ -231,7 +233,7 @@ public:
             }
         }
 
-        size_t start_position = current_position + posInLine - 1;
+        int start_position = current_position + position - 1;
         if (start_position + numSymbols > text_len) {
             numSymbols = text_len - start_position;
         }
@@ -240,13 +242,13 @@ public:
         strncpy(bufferCopy, text + start_position, numSymbols);
         bufferCopy[numSymbols] = '\0';
 
-        deleteText(line, posInLine, numSymbols);
+        deleteText(line, position, numSymbols);
     }
 
-    void copyText(size_t line, size_t posInLine, size_t numSymbols) {
-        size_t current_line = 0;
-        size_t current_position = 0;
-        size_t text_len = strlen(text);
+    void copyText(int line, int position, int numSymbols) {
+        int current_line = 0;
+        int current_position = 0;
+        int text_len = strlen(text);
 
         while (current_line <= line && current_position <= text_len) {
             if (text[current_position] == '\n') {
@@ -260,7 +262,7 @@ public:
             }
         }
 
-        size_t start_position = current_position + posInLine - 1;
+        int start_position = current_position + position - 1;
         if (start_position + numSymbols > text_len) {
             numSymbols = text_len - start_position;
         }
@@ -270,13 +272,43 @@ public:
         bufferCopy[numSymbols] = '\0';
     }
 
-    void pasteText(size_t line, size_t posInLine) {
+    void pasteText(int line, int position) {
         if (bufferCopy == nullptr) {
             cout << "Clipboard is empty!" << endl;
             return;
         }
 
-        insert(line, posInLine, bufferCopy);
+        insert(line, position, bufferCopy);
+    }
+
+    void insertWithReplacement(int line, int position, char *newText) {
+        int newTextLength = strlen(newText);
+        int text_len = strlen(text);
+
+        int current_line = 0;
+        int current_position = 0;
+
+        while (current_line <= line && current_position <= text_len) {
+            if (text[current_position] == '\n') {
+                current_line++;
+                current_position++;
+            }
+            current_position++;
+
+            if (current_line == line) {
+                break;
+            }
+        }
+
+        int start_position = current_position + position - 1;
+        int end_position = start_position + newTextLength;
+
+        if (end_position > text_len) {
+            end_position = text_len;
+        }
+
+        deleteText(line, position, end_position - start_position);
+        insert(line, position, newText);
     }
 };
 
@@ -297,7 +329,8 @@ int main() {
     cout << "'k' to cut text" << endl;
     cout << "'l' to copy text" << endl;
     cout << "'m' to paste text" << endl;
-    cout << "'o' TO EXIT" << endl;
+    cout << "'n' to insert with replacement" << endl;
+    cout << "'0' TO EXIT" << endl;
     cout << endl;
 
     do {
@@ -339,7 +372,7 @@ int main() {
                 break;
             }
             case 'f': {
-                size_t line, pos;
+                int line, pos;
                 char newText[256];
                 cout << "Enter the line number: ";
                 cin >> line;
@@ -361,7 +394,7 @@ int main() {
                 break;
             }
             case 'h': {
-                size_t line, pos, numSymbols;
+                int line, pos, numSymbols;
                 cout << "Enter the line number: ";
                 cin >> line;
                 cout << "Enter the position in line: ";
@@ -381,7 +414,7 @@ int main() {
                 break;
             }
             case 'k': {
-                size_t line, pos, numSymbols;
+                int line, pos, numSymbols;
                 cout << "Enter the line number: ";
                 cin >> line;
                 cout << "Enter the position in line: ";
@@ -393,7 +426,7 @@ int main() {
                 break;
             }
             case 'l': {
-                size_t line, pos, numSymbols;
+                int line, pos, numSymbols;
                 cout << "Enter the line number: ";
                 cin >> line;
                 cout << "Enter the position in line: ";
@@ -406,7 +439,7 @@ int main() {
             }
 
             case 'm': {
-                size_t line, pos;
+                int line, pos;
                 cout << "Enter the line number: ";
                 cin >> line;
                 cout << "Enter the position in line: ";
@@ -415,8 +448,23 @@ int main() {
                 cout << "Text pasted!" << endl;
                 break;
             }
+            case 'n': {
+                int line, pos;
+                char newText[256];
+                cout << "Enter the line number: ";
+                cin >> line;
+                cout << "Enter the position in line: ";
+                cin >> pos;
+                cout << "Enter the text to insert: ";
+                cin.ignore();
+                cin.getline(newText, sizeof(newText));
+                editor.insertWithReplacement(line, pos, newText);
+                cout << "Text inserted!" << endl;
+                break;
 
-            case 'o': {
+            }
+
+            case '0': {
                 cout << "Thanks for using the program!" << endl;
                 break;
             }
@@ -426,7 +474,7 @@ int main() {
             }
         }
 
-    } while (command != 'o');
+    } while (command != '0');
 
     return 0;
 }
