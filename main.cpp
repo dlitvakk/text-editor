@@ -1,14 +1,31 @@
 #include <iostream>
+#include <stack>
 using namespace std;
 
 class TextEditor {
     char* text;
     size_t length;
+    stack<char*> undoStack;
+    stack<char*> redoStack;
 
     void capacity(size_t newLength) {
         if (newLength > length) {
             text = (char*)realloc(text, newLength);
             length = newLength;
+        }
+    }
+
+    void saveCommand(stack<char*>& stack) {
+        char* newCommand = (char*)malloc(strlen(text) + 1);
+        strcpy(newCommand, text);
+        stack.push(newCommand);
+    }
+
+    void saveUndos() {
+        saveCommand(undoStack);
+        while (!redoStack.empty()) {
+            free(redoStack.top());
+            redoStack.pop();
         }
     }
 
@@ -20,6 +37,15 @@ public:
 
     ~TextEditor() { // A place where memory deallocation and object descrutrion takes place
         free(text);
+        while (!undoStack.empty()) {
+            free(undoStack.top());
+            undoStack.pop();
+        }
+
+        while (!redoStack.empty()) {
+            free(redoStack.top());
+            redoStack.pop();
+        }
     }
 
     char* getText() const { // const means that this method does not change the object
@@ -31,12 +57,14 @@ public:
         size_t oldLength = strlen(text);
         capacity(oldLength + newLength + 1);
         strcat(text, newText);
+        saveCommand(undoStack);
     }
 
     void addNewLine() {
         size_t oldLength = strlen(text);
         capacity(oldLength + 2);
         strcat(text, "\n");
+        saveCommand(undoStack);
     }
 
     void insert(size_t line, size_t posInLine, char* newText) {
@@ -68,6 +96,7 @@ public:
 
         memmove(text + insertion_position + buffer_len, text + insertion_position, text_len - insertion_position + 1);
         memcpy(text + insertion_position, newText, buffer_len);
+        saveCommand(undoStack);
     }
 
     void clear() {
@@ -129,6 +158,53 @@ public:
             cout << "Text is not found!" << endl;
         }
     }
+
+    void deleteText(size_t line, size_t posInLine, size_t numSymbols) {
+        size_t current_line = 0;
+        size_t current_position = 0;
+        size_t text_len = strlen(text);
+
+        while (current_line <= line && current_position <= text_len) {
+            if (text[current_position] == '\n') {
+                current_line++;
+                current_position++;
+            }
+            current_position++;
+
+            if (current_line == line) {
+                break;
+            }
+        }
+
+        size_t start_position = current_position + posInLine - 1;
+        size_t end_position = start_position + numSymbols;
+
+        memmove(text + start_position, text + end_position, text_len - end_position + 1);
+        saveCommand(undoStack);
+    }
+
+    void undo() {
+        if (!undoStack.empty()) {
+            free(text);
+            undoStack.pop();
+            text = undoStack.top();
+        }
+
+        if(undoStack.empty()) {
+            cout << "No more commands to undo!" << endl;
+        }
+    }
+
+    void redo() {
+        if (!redoStack.empty()) {
+            saveCommand(undoStack);
+            free(text);
+            text = redoStack.top();
+            redoStack.pop();
+        } else {
+            cout << "No more commands to redo!" << endl;
+        }
+    }
 };
 
 int main() {
@@ -142,6 +218,9 @@ int main() {
     cout << "'5' to print the text to console" << endl;
     cout << "'6' to insert text" << endl;
     cout << "'7' to search for text" << endl;
+    cout << "'8' to delete" << endl;
+    cout << "'9' to undo command" << endl;
+    cout << "'a' to undo command" << endl;
     cout << "'0' TO EXIT" << endl;
     cout << endl;
 
@@ -205,6 +284,27 @@ int main() {
                 editor.findText(searchText);
                 break;
             }
+            case '8': {
+                size_t line, pos, numSymbols;
+                cout << "Enter the line number: ";
+                cin >> line;
+                cout << "Enter the position in line: ";
+                cin >> pos;
+                cout << "Enter the number of symbols to delete: ";
+                cin >> numSymbols;
+                editor.deleteText(line, pos, numSymbols);
+                cout << "Text deleted!" << endl;
+                break;
+            }
+            case '9': {
+                editor.undo();
+                break;
+            }
+            case 'a': {
+                editor.redo();
+                break;
+            }
+
             case '0': {
                 cout << "Thanks for using the program!" << endl;
                 break;
