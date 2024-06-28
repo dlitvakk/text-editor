@@ -2,10 +2,48 @@
 #include <stack>
 #include <cstring>
 #include <dlfcn.h>
-
-
 using namespace std;
+class CaesarCipher {
+    void* handle;
+    typedef char* (*EncryptFunc)(char*, int);
+    typedef char* (*DecryptFunc)(char*, int);
+    EncryptFunc encryptFunc;
+    DecryptFunc decryptFunc;
 
+public:
+    CaesarCipher(const char* libPath) : handle(nullptr) {
+        handle = dlopen(libPath, RTLD_LAZY);
+        if (!handle) {
+            cerr << "Failed to load library: " << dlerror() << endl;
+            exit(1);
+        }
+
+        encryptFunc = (EncryptFunc)dlsym(handle, "encrypt");
+        if (!encryptFunc) {
+            cerr << "Failed to load encrypt function: " << dlerror() << endl;
+            dlclose(handle);
+            exit(1);
+        }
+        decryptFunc = (DecryptFunc)dlsym(handle, "decrypt");
+        if (!decryptFunc) {
+            cerr << "Failed to load decrypt function: " << dlerror() << endl;
+            dlclose(handle);
+            exit(1);
+        }
+    }
+
+    ~CaesarCipher() {
+        dlclose(handle);
+    }
+
+    char* encryptText(char* text, int key) {
+        return encryptFunc(text, key);
+    }
+
+    char* decryptText(char* text, int key) {
+        return decryptFunc(text, key);
+    }
+};
 class TextEditor {
     char* text;
     size_t length;
@@ -220,53 +258,62 @@ public:
             cout << "No commands to redo!" << endl;
         }
     }
+
+    void encrypt(int key, CaesarCipher& cipher) {
+        char* encryptedText = cipher.encryptText(text, key);
+        if (encryptedText) {
+            strcpy(text, encryptedText);
+            free(encryptedText);
+            cout << "Text encrypted!" << endl;
+        } else {
+            cerr << "Encryption failed!" << endl;
+        }
+    }
+
+    void decrypt(int key, CaesarCipher& cipher) {
+        char* decryptedText = cipher.decryptText(text, key);
+        if (decryptedText) {
+            strcpy(text, decryptedText);
+            free(decryptedText);
+            cout << "Text decrypted!" << endl;
+        } else {
+            cerr << "Decryption failed!" << endl;
+        }
+    }
+
+    void encrypt_from_file(int key, CaesarCipher& cipher, const char* filename) {
+        FILE* file = fopen(filename, "r");
+        if (!file) {
+            cerr << "Error opening file!" << endl;
+            return;
+        }
+        clear();
+        char buffer[256];
+        while (fgets(buffer, sizeof(buffer), file)) {
+            enterText(buffer);
+        }
+        fclose(file);
+        encrypt(key, cipher);
+    }
+
+    void decrypt_from_file(int key, CaesarCipher& cipher, const char* filename) {
+        FILE* file = fopen(filename, "r");
+        if (!file) {
+            cerr << "Error opening file!" << endl;
+            return;
+        }
+        clear();
+        char buffer[256];
+        while (fgets(buffer, sizeof(buffer), file)) {
+            enterText(buffer);
+        }
+        fclose(file);
+        decrypt(key, cipher);
+    }
+
 };
 
-class CaesarCipher {
-    void* handle;
-    typedef char* (*EncryptFunc)(char*, int);
-    typedef char* (*DecryptFunc)(char*, int);
-    EncryptFunc encryptFunc;
-    DecryptFunc decryptFunc;
 
-public:
-    CaesarCipher(const char* libPath);
-    ~CaesarCipher();
-    char* encryptText(char* text, int key);
-    char* decryptText(char* text, int key);
-};
-
-CaesarCipher::CaesarCipher(const char* libPath) {
-    handle = dlopen(libPath, RTLD_LAZY);
-    if (!handle) {
-        cerr << "Failed to load library: " << dlerror() << std::endl;
-        exit(1);
-    }
-
-    encryptFunc = (EncryptFunc)dlsym(handle, "encrypt");
-    if (!encryptFunc) {
-        std::cerr << "Failed to load encrypt function: " << dlerror() << std::endl;
-        dlclose(handle);
-        exit(1);
-    }
-    decryptFunc = (DecryptFunc)dlsym(handle, "decrypt");
-    if (!decryptFunc) {
-        std::cerr << "Failed to load decrypt function: " << dlerror() << std::endl;
-        dlclose(handle);
-        exit(1);
-    }
-}
-CaesarCipher::~CaesarCipher() {
-    dlclose(handle);
-}
-
-char* CaesarCipher::encryptText(char* text, int key) {
-    return encryptFunc(text, key);
-}
-
-char* CaesarCipher::decryptText(char* text, int key) {
-    return decryptFunc(text, key);
-}
 int main() {
     TextEditor editor;
     char command;
@@ -287,6 +334,10 @@ int main() {
     cout << "'l' to copy text" << endl;
     cout << "'m' to paste text" << endl;
     cout << "'n' to set cursor position" << endl;
+    cout << "'o' to encrypt text" << endl;
+    cout << "'r' to encrypt text from file" << endl;
+    cout << "'p' to decrypt text" << endl;
+    cout << "'s' to decrypt text from file" << endl;
     cout << "'0' TO EXIT" << endl;
     cout << endl;
 
@@ -393,19 +444,40 @@ int main() {
                 break;
             }
             case 'o': {
-                cout << "Enter the text to encrypt: ";
-                char text[256];
-                cin.ignore();
-                cin.getline(text, sizeof(text));
                 int key;
-                cout << "Enter the key: ";
+                cout << "Enter the key for encryption: ";
                 cin >> key;
-
-                char* encryptedText = cipher.encryptText(text, key);
-                cout << "Encrypted text: " << encryptedText << endl;
-                delete[] encryptedText; // Remember to free allocated memory
+                editor.encrypt(key, cipher);
                 break;
             }
+            case 'p': {
+                int key;
+                cout << "Enter the key for decryption: ";
+                cin >> key;
+                editor.decrypt(key, cipher);
+                break;
+            }
+            case 'r': {
+                int key;
+                char filename[100];
+                cout << "Enter the key for encryption: ";
+                cin >> key;
+                cout << "Enter the file name for loading: ";
+                cin >> filename;
+                editor.encrypt_from_file(key, cipher, filename);
+                break;
+            }
+            case 's': {
+                int key;
+                char filename[100];
+                cout << "Enter the key for decryption: ";
+                cin >> key;
+                cout << "Enter the file name for loading: ";
+                cin >> filename;
+                editor.decrypt_from_file(key, cipher, filename);
+                break;
+            }
+
             case '0': {
                 cout << "Thanks for using the program!" << endl;
                 break;
