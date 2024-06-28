@@ -1,106 +1,141 @@
 #include <iostream>
 #include <stack>
+#include <cstring>
+#include <dlfcn.h>
+
+
 using namespace std;
 
 class TextEditor {
     char* text;
     size_t length;
-    stack<char*> undoStack;
-    stack<char*> redoStack;
+    stack<char*> undo;
+    stack<char*> redo;
     char* bufferCopy;
+    int cursorLine;
+    int cursorPosition;
 
-
-    void capacity(size_t newLength) {
-        if (newLength > length) {
-            text = (char*)realloc(text, newLength);
-            length = newLength;
-        }
+    void capacity(size_t newSize) {
+        text = (char*)realloc(text, newSize);
     }
 
-    void saveCommand(stack<char*>& stack) {
-        char* newCommand = (char*)malloc(strlen(text) + 1);
-        strcpy(newCommand, text);
-        stack.push(newCommand);
+    void saveCommand(stack<char*>& commandStack) {
+        char* temp = (char*)malloc(strlen(text) + 1);
+        strcpy(temp, text);
+        commandStack.push(temp);
     }
 
     void emptyRedoStack() {
-        while (!redoStack.empty()) {
-            free(redoStack.top());
-            redoStack.pop();
+        while (!redo.empty()) {
+            free(redo.top());
+            redo.pop();
         }
     }
 
+    int calculateCursorIndex(int line, int pos) const {
+        int index = 0;
+        int currentLine = 0;
+        int currentPosition = 0;
+        while (text[index] != '\0') {
+            if (currentLine == line && currentPosition == pos) {
+                break;
+            }
+            if (text[index] == '\n') {
+                currentLine++;
+                currentPosition = 0;
+            } else {
+                currentPosition++;
+            }
+            index++;
+        }
+        return index;
+    }
+
 public:
-    TextEditor() : text(nullptr), length(0), bufferCopy(nullptr) { // A place for constructing the object, setting default values and memory allocation
+    TextEditor() : text(nullptr), length(0), bufferCopy(nullptr), cursorLine(0), cursorPosition(0) {
         text = (char*)malloc(1);
         text[0] = '\0';
     }
 
-    ~TextEditor() { // A place where memory deallocation and object descrutrion takes place
+    ~TextEditor() {
         free(text);
-        while (!undoStack.empty()) {
-            free(undoStack.top());
-            undoStack.pop();
+        while (!undo.empty()) {
+            free(undo.top());
+            undo.pop();
         }
-
         emptyRedoStack();
         if (bufferCopy != nullptr) {
             free(bufferCopy);
         }
     }
 
-    char* getText() const { // const means that this method does not change the object
-        return text;
+    void setCursorPosition(int line, int pos) {
+        cursorLine = line;
+        cursorPosition = pos;
     }
 
     void enterText(const char* newText) {
+        int cursorIndex = calculateCursorIndex(cursorLine, cursorPosition);
         size_t newLength = strlen(newText);
         size_t oldLength = strlen(text);
         capacity(oldLength + newLength + 1);
-        strcat(text, newText);
-        saveCommand(undoStack);
+
+        memmove(text + cursorIndex + newLength, text + cursorIndex, oldLength - cursorIndex + 1);
+        memcpy(text + cursorIndex, newText, newLength);
+
+        saveCommand(undo);
         emptyRedoStack();
     }
 
     void addNewLine() {
-        size_t oldLength = strlen(text);
-        capacity(oldLength + 2);
-        strcat(text, "\n");
-        saveCommand(undoStack);
+        enterText("\n");
+    }
+
+    void insertText(const char* newText) {
+        enterText(newText);
+    }
+
+    void insertWithReplacement(const char* newText, int numSymbols) {
+        deleteText(numSymbols);
+        insertText(newText);
+    }
+
+    void deleteText(int numSymbols) {
+        int cursorIndex = calculateCursorIndex(cursorLine, cursorPosition);
+        int text_len = strlen(text);
+        if (cursorIndex + numSymbols > text_len) {
+            numSymbols = text_len - cursorIndex;
+        }
+
+        memmove(text + cursorIndex, text + cursorIndex + numSymbols, text_len - cursorIndex - numSymbols + 1);
+        saveCommand(undo);
         emptyRedoStack();
     }
 
-    void insert(int line, int posititon, char* newText) {
-        size_t buffer_len = strlen(newText);
-        if (newText[buffer_len - 1] == '\n') {
-            newText[buffer_len - 1] = '\0';
-            buffer_len--;
+    void cutText(int numSymbols) {
+        copyText(numSymbols);
+        deleteText(numSymbols);
+    }
+
+    void copyText(int numSymbols) {
+        int cursorIndex = calculateCursorIndex(cursorLine, cursorPosition);
+        int text_len = strlen(text);
+        if (cursorIndex + numSymbols > text_len) {
+            numSymbols = text_len - cursorIndex;
         }
 
-        int current_line = 0;
-        int current_position = 0;
-        size_t text_len = strlen(text);
+        bufferCopy = (char*)realloc(bufferCopy, numSymbols + 1);
+        strncpy(bufferCopy, text + cursorIndex, numSymbols);
+        bufferCopy[numSymbols] = '\0';
+    }
 
-        while (current_line <= line && current_position <= static_cast<int>(text_len)) {
-            if (text[current_position] == '\n') {
-                current_line++;
-                current_position++;
-            }
-            current_position++;
-
-            if (current_line == line) {
-                break;
-            }
+    void pasteText() {
+        if (bufferCopy == nullptr) {
+            cout << "Clipboard is empty!" << endl;
+            return;
         }
 
-        int insertion_position = current_position + posititon - 1;
-        size_t new_text_len = text_len + buffer_len;
-        text = (char*)realloc(text, new_text_len + 1);
-
-        memmove(text + insertion_position + buffer_len, text + insertion_position, text_len - insertion_position + 1);
-        memcpy(text + insertion_position, newText, buffer_len);
-        saveCommand(undoStack);
-        emptyRedoStack();
+        insertText(bufferCopy);
     }
 
     void clear() {
@@ -141,7 +176,6 @@ public:
         bool found = false;
 
         while ((foundPosition = strstr(foundPosition, searchText)) != nullptr) {
-
             int lineNumber = 0;
             int linePosition = 0;
             for (const char* pointer = text; pointer < foundPosition; ++pointer) {
@@ -163,158 +197,81 @@ public:
         }
     }
 
-    void deleteText(int line, int position, int numSymbols) {
-        int current_line = 0;
-        int current_position = 0;
-        int text_len = strlen(text);
-
-        while (current_line <= line && current_position <= text_len) {
-            if (text[current_position] == '\n') {
-                current_line++;
-                current_position++;
-            }
-            current_position++;
-
-            if (current_line == line) {
-                break;
-            }
-        }
-
-        int start_position = current_position + position - 1;
-        int end_position = start_position + numSymbols;
-
-        memmove(text + start_position, text + end_position, text_len - end_position + 1);
-        saveCommand(undoStack);
-        emptyRedoStack();
-    }
-
-    void undo() {
-        if (!undoStack.empty()) {
-            saveCommand(redoStack);
+    void undoCommand() {
+        if (!undo.empty()) {
+            saveCommand(redo);
             free(text);
-            undoStack.pop();
-            text = undoStack.top();
+            text = undo.top();
+            undo.pop();
             cout << "Successful undo!" << endl;
-        }
-
-        else {
+        } else {
             cout << "No commands to undo!" << endl;
         }
     }
 
-    void redo() {
-        if (!redoStack.empty()) {
-            saveCommand(undoStack);
+    void redoCommand() {
+        if (!redo.empty()) {
+            saveCommand(undo);
             free(text);
-            // redoStack.pop();
-            text = redoStack.top();
-            redoStack.pop();
+            text = redo.top();
+            redo.pop();
             cout << "Successful redo!" << endl;
-        }
-
-        else {
+        } else {
             cout << "No commands to redo!" << endl;
         }
     }
-    void cutText(int line, int position, int numSymbols) {
-        int current_line = 0;
-        int current_position = 0;
-        int text_len = strlen(text);
-
-        while (current_line <= line && current_position <= text_len) {
-            if (text[current_position] == '\n') {
-                current_line++;
-                current_position++;
-            }
-            current_position++;
-
-            if (current_line == line) {
-                break;
-            }
-        }
-
-        int start_position = current_position + position - 1;
-        if (start_position + numSymbols > text_len) {
-            numSymbols = text_len - start_position;
-        }
-
-        bufferCopy = (char*)realloc(bufferCopy, numSymbols + 1);
-        strncpy(bufferCopy, text + start_position, numSymbols);
-        bufferCopy[numSymbols] = '\0';
-
-        deleteText(line, position, numSymbols);
-    }
-
-    void copyText(int line, int position, int numSymbols) {
-        int current_line = 0;
-        int current_position = 0;
-        int text_len = strlen(text);
-
-        while (current_line <= line && current_position <= text_len) {
-            if (text[current_position] == '\n') {
-                current_line++;
-                current_position++;
-            }
-            current_position++;
-
-            if (current_line == line) {
-                break;
-            }
-        }
-
-        int start_position = current_position + position - 1;
-        if (start_position + numSymbols > text_len) {
-            numSymbols = text_len - start_position;
-        }
-
-        bufferCopy = (char*)realloc(bufferCopy, numSymbols + 1);
-        strncpy(bufferCopy, text + start_position, numSymbols);
-        bufferCopy[numSymbols] = '\0';
-    }
-
-    void pasteText(int line, int position) {
-        if (bufferCopy == nullptr) {
-            cout << "Clipboard is empty!" << endl;
-            return;
-        }
-
-        insert(line, position, bufferCopy);
-    }
-
-    void insertWithReplacement(int line, int position, char *newText) {
-        int newTextLength = strlen(newText);
-        int text_len = strlen(text);
-
-        int current_line = 0;
-        int current_position = 0;
-
-        while (current_line <= line && current_position <= text_len) {
-            if (text[current_position] == '\n') {
-                current_line++;
-                current_position++;
-            }
-            current_position++;
-
-            if (current_line == line) {
-                break;
-            }
-        }
-
-        int start_position = current_position + position - 1;
-        int end_position = start_position + newTextLength;
-
-        if (end_position > text_len) {
-            end_position = text_len;
-        }
-
-        deleteText(line, position, end_position - start_position);
-        insert(line, position, newText);
-    }
 };
 
+class CaesarCipher {
+    void* handle;
+    typedef char* (*EncryptFunc)(char*, int);
+    typedef char* (*DecryptFunc)(char*, int);
+    EncryptFunc encryptFunc;
+    DecryptFunc decryptFunc;
+
+public:
+    CaesarCipher(const char* libPath);
+    ~CaesarCipher();
+    char* encryptText(char* text, int key);
+    char* decryptText(char* text, int key);
+};
+
+CaesarCipher::CaesarCipher(const char* libPath) {
+    handle = dlopen(libPath, RTLD_LAZY);
+    if (!handle) {
+        cerr << "Failed to load library: " << dlerror() << std::endl;
+        exit(1);
+    }
+
+    encryptFunc = (EncryptFunc)dlsym(handle, "encrypt");
+    if (!encryptFunc) {
+        std::cerr << "Failed to load encrypt function: " << dlerror() << std::endl;
+        dlclose(handle);
+        exit(1);
+    }
+    decryptFunc = (DecryptFunc)dlsym(handle, "decrypt");
+    if (!decryptFunc) {
+        std::cerr << "Failed to load decrypt function: " << dlerror() << std::endl;
+        dlclose(handle);
+        exit(1);
+    }
+}
+CaesarCipher::~CaesarCipher() {
+    dlclose(handle);
+}
+
+char* CaesarCipher::encryptText(char* text, int key) {
+    return encryptFunc(text, key);
+}
+
+char* CaesarCipher::decryptText(char* text, int key) {
+    return decryptFunc(text, key);
+}
 int main() {
     TextEditor editor;
     char command;
+    const char* libPath ="/Users/dlitvakk21/CLionProjects/untitled3/ceaser.so";
+    CaesarCipher cipher(libPath);
 
     cout << "Enter 'a' to enter text to the end" << endl;
     cout << "'b' to add new line" << endl;
@@ -329,7 +286,7 @@ int main() {
     cout << "'k' to cut text" << endl;
     cout << "'l' to copy text" << endl;
     cout << "'m' to paste text" << endl;
-    cout << "'n' to insert with replacement" << endl;
+    cout << "'n' to set cursor position" << endl;
     cout << "'0' TO EXIT" << endl;
     cout << endl;
 
@@ -372,16 +329,11 @@ int main() {
                 break;
             }
             case 'f': {
-                int line, pos;
-                char newText[256];
-                cout << "Enter the line number: ";
-                cin >> line;
-                cout << "Enter the position in line: ";
-                cin >> pos;
                 cout << "Enter the text to insert: ";
+                char newText[256];
                 cin.ignore();
                 cin.getline(newText, sizeof(newText));
-                editor.insert(line, pos, newText);
+                editor.insertText(newText);
                 cout << "Text inserted!" << endl;
                 break;
             }
@@ -394,76 +346,66 @@ int main() {
                 break;
             }
             case 'h': {
-                int line, pos, numSymbols;
-                cout << "Enter the line number: ";
-                cin >> line;
-                cout << "Enter the position in line: ";
-                cin >> pos;
+                int numSymbols;
                 cout << "Enter the number of symbols to delete: ";
                 cin >> numSymbols;
-                editor.deleteText(line, pos, numSymbols);
+                editor.deleteText(numSymbols);
                 cout << "Text deleted!" << endl;
                 break;
             }
             case 'i': {
-                editor.undo();
+                editor.undoCommand();
                 break;
             }
             case 'j': {
-                editor.redo();
+                editor.redoCommand();
                 break;
             }
             case 'k': {
-                int line, pos, numSymbols;
-                cout << "Enter the line number: ";
-                cin >> line;
-                cout << "Enter the position in line: ";
-                cin >> pos;
+                int numSymbols;
                 cout << "Enter the number of symbols to cut: ";
                 cin >> numSymbols;
-                editor.cutText(line, pos, numSymbols);
+                editor.cutText(numSymbols);
                 cout << "Text cut!" << endl;
                 break;
             }
             case 'l': {
-                int line, pos, numSymbols;
-                cout << "Enter the line number: ";
-                cin >> line;
-                cout << "Enter the position in line: ";
-                cin >> pos;
+                int numSymbols;
                 cout << "Enter the number of symbols to copy: ";
                 cin >> numSymbols;
-                editor.copyText(line, pos, numSymbols);
+                editor.copyText(numSymbols);
                 cout << "Text copied!" << endl;
                 break;
             }
-
             case 'm': {
-                int line, pos;
-                cout << "Enter the line number: ";
-                cin >> line;
-                cout << "Enter the position in line: ";
-                cin >> pos;
-                editor.pasteText(line, pos);
+                editor.pasteText();
                 cout << "Text pasted!" << endl;
                 break;
             }
             case 'n': {
-                int line, pos;
-                char newText[256];
+                int line, column;
                 cout << "Enter the line number: ";
                 cin >> line;
-                cout << "Enter the position in line: ";
-                cin >> pos;
-                cout << "Enter the text to insert: ";
-                cin.ignore();
-                cin.getline(newText, sizeof(newText));
-                editor.insertWithReplacement(line, pos, newText);
-                cout << "Text inserted!" << endl;
+                cout << "Enter the column number: ";
+                cin >> column;
+                editor.setCursorPosition(line, column);
+                cout << "Cursor position set to line " << line << ", column " << column << "!" << endl;
                 break;
-
             }
+            case 'o': {
+                cout << "Enter the text to encrypt: ";
+                char text[256];
+                cin.ignore();
+                cin.getline(text, sizeof(text));
+                int key;
+                cout << "Enter the key: ";
+                cin >> key;
 
+                char* encryptedText = cipher.encryptText(text, key);
+                cout << "Encrypted text: " << encryptedText << endl;
+                delete[] encryptedText; // Remember to free allocated memory
+                break;
+            }
             case '0': {
                 cout << "Thanks for using the program!" << endl;
                 break;
@@ -478,6 +420,3 @@ int main() {
 
     return 0;
 }
-
-// /Users/dlitvakk21/CLionProjects/text-editor/savetext.txt
-// /Users/dlitvakk21/CLionProjects/text-editor/loadtext.txt
