@@ -335,9 +335,7 @@ int main() {
     cout << "'m' to paste text" << endl;
     cout << "'n' to set cursor position" << endl;
     cout << "'o' to encrypt text" << endl;
-    cout << "'r' to encrypt text from file" << endl;
     cout << "'p' to decrypt text" << endl;
-    cout << "'s' to decrypt text from file" << endl;
     cout << "'0' TO EXIT" << endl;
     cout << endl;
 
@@ -444,37 +442,37 @@ int main() {
                 break;
             }
             case 'o': {
+                cout << "Do you want to encrypt the text from file? (y/n): ";
+                char answer;
+                cin >> answer;
                 int key;
                 cout << "Enter the key for encryption: ";
                 cin >> key;
-                editor.encrypt(key, cipher);
+                if(answer == 'y') {
+                    char filename[100];
+                    cout << "Enter the file name for loading: ";
+                    cin >> filename;
+                    editor.encrypt_from_file(key, cipher, filename);
+                } else {
+                    editor.encrypt(key, cipher);
+                }
                 break;
             }
             case 'p': {
+                cout << "Do you want to decrypt the text from file? (y/n): ";
+                char answer;
+                cin >> answer;
                 int key;
                 cout << "Enter the key for decryption: ";
                 cin >> key;
-                editor.decrypt(key, cipher);
-                break;
-            }
-            case 'r': {
-                int key;
-                char filename[100];
-                cout << "Enter the key for encryption: ";
-                cin >> key;
-                cout << "Enter the file name for loading: ";
-                cin >> filename;
-                editor.encrypt_from_file(key, cipher, filename);
-                break;
-            }
-            case 's': {
-                int key;
-                char filename[100];
-                cout << "Enter the key for decryption: ";
-                cin >> key;
-                cout << "Enter the file name for loading: ";
-                cin >> filename;
-                editor.decrypt_from_file(key, cipher, filename);
+                if(answer == 'y') {
+                    char filename[100];
+                    cout << "Enter the file name for loading: ";
+                    cin >> filename;
+                    editor.decrypt_from_file(key, cipher, filename);
+                } else {
+                    editor.decrypt(key, cipher);
+                }
                 break;
             }
 
